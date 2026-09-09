@@ -1,0 +1,36 @@
+{
+  "name": "pi-mcp-dsh",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MCP bridge for pi, modeled on a single reference source (dsh mcp-client): deferred-registration mcp__server__tool tools on pi's Dynamic Tool Loading, lazy server start, two-phase generation exchange.",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test --workspaces"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.4",
+    "@types/node": "^24.0.0",
+    "typebox": "^1.0.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}

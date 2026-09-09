@@ -1,0 +1,32 @@
+{
+  "name": "pi-mcp-dsh-bridge",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared contract for pi-mcp-dsh: mcp naming contract, MCP config validation, loader scoring, schema coercion, tool-result projection. Single reference source: dsh mcp-client.",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "license": "MIT",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types test/bridge.spec.ts"
+  },
+  "dependencies": {
+    "typebox": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.4",
+    "@types/node": "^24.0.0",
+    "typebox": "^1.0.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "pi-mcp-dsh-core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "pi-mcp-dsh core (host): lazy-connect MCP client on pi's Dynamic Tool Loading, mcp loader tool, two-phase generation exchange. Single reference source: dsh mcp-client.",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "license": "MIT",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types test/smoke.spec.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "pi-mcp-dsh-bridge": "file:../bridge",
+    "typebox": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.4",
+    "@types/node": "^24.0.0",
+    "typebox": "^1.0.0",
+    "typescript": "^5.9.3"
+  }
+}

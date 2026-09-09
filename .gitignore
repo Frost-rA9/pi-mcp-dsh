@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+.npm-cache/
+
+# Pi agent internal state
+.pi/
+
+# Logs / OS noise
+*.log
+*.local
+.DS_Store
+Thumbs.db
+
+# Local design notes (不入库)
+/AGENTS.md
