@@ -31,7 +31,7 @@
 
 ## 后端
 
-MCP server 经 stdio transport，配置驱动（`~/.pi/agent/mcp.json` 或 `.pi/mcp.json` 的 `mcpServers`）。dsh `mcp-client` 研究与设计依据见 [RESEARCH.md](RESEARCH.md) 与本地 `AGENTS.md`（gitignored）。
+MCP server 经 stdio transport，配置驱动（`~/.pi/agent/mcp.json` 或 `.pi/mcp.json` 的 `mcpServers`）。dsh `mcp-client` 研究见 [RESEARCH.md](RESEARCH.md)，设计依据见 [DESIGN.md](DESIGN.md)。
 
 ## 许可证
 
