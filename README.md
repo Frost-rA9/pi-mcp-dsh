@@ -7,7 +7,8 @@ A pi extension that bridges MCP server tools into **real pi tools** (`mcp__<serv
 **Deferred registration + lazy server start on pi's native Dynamic Tool Loading.** Every bridged MCP tool is registered as a real pi tool but kept *inactive* — zero prompt cost until used. A single `mcp` loader discovers, activates, and calls.
 
 - Servers come only from config (`~/.pi/agent/mcp.json` / project `.pi/mcp.json`); a server starts **lazily** on its first call, so a cold start connects to nothing.
-- The `mcp` loader has four actions: `list` (see all tools across servers), `search` (find tools by query and **activate** matches additively), `describe` (show a tool's schema), `call` (invoke a tool).
+- The `mcp` loader has four actions: `list` (see all tools across servers), `search` (find tools by query and **activate** matches additively), `describe` (with `tool`: that tool's schema; with `server` only: that server's instructions and tool count), `call` (invoke a tool).
+- Server instructions are delivered **on demand** by `describe`: they never enter a standing prompt, and instructions larger than 32768 bytes are withheld with a stated reason.
 - Activation is purely additive via `pi.setActiveTools`, so pi anchors the new schemas via Anthropic `defer_loading` / OpenAI `tool_search` on the next request.
 - Naming contract (dsh `publicToolName`): `mcp__<server>__<rawName>`, normalized to at most 64 chars; a lossy normalization appends a SHA-256 hash so distinct MCP identities never collapse.
 
@@ -24,10 +25,10 @@ This is **cross-cutting infrastructure** — how external MCP tools reach the mo
 ## Design rules
 
 1. Every bridged MCP tool is a real pi tool (`mcp__<server>__<raw>`) but inactive until used — zero prompt cost.
-2. Servers start lazily on first use; nothing spawns on cold start.
-3. Two-phase generation exchange (dsh `syncTools`): fetch the full next generation first; any failure keeps the previous generation — the model sees all-or-nothing.
+2. Servers start lazily on first use; nothing spawns on cold start, and concurrent first calls share one connection (single-flight).
+3. Two-phase generation exchange (dsh `syncTools`): fetch the full next generation first; any failure keeps the previous generation — the model sees all-or-nothing. A server that advertises no tools capability connects with an empty tool set instead of failing.
 4. **Fail closed**: a restricted tool surface refuses MCP tool calls.
-5. Result projection maps `isError` to pi's error results and never silently drops content blocks.
+5. Result projection maps `isError` to pi's error results, never silently drops content blocks, and carries canonical `structuredContent` into tool `details` (host-only, no prompt cost).
 
 ## Backends
 
