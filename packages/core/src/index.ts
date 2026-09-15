@@ -35,7 +35,7 @@ type McpParamsT = Static<typeof McpParams>;
 function buildGuidelines(ids: string[]): string[] {
   const g = [
     "Bridged MCP tools appear as real pi tools named mcp__<server>__<tool>. Use mcp({action:\"search\", query}) to find tools for a capability — matching tools are activated automatically and become directly callable by name.",
-    "Use mcp({action:\"list\"}) to see all tools across servers; mcp({action:\"describe\", server, tool}) shows a tool's parameter schema.",
+    "Use mcp({action:\"list\"}) to see all tools across servers; mcp({action:\"describe\", server, tool}) shows a tool's parameter schema; mcp({action:\"describe\", server}) shows that server's instructions and tool count.",
     "Call a tool directly via mcp({action:\"call\", server:\"<server>\", tool:\"<tool>\", args:{...}}); the server starts lazily on first call.",
     ids.length > 0
       ? `Available MCP servers: ${ids.join(", ")}.`
@@ -84,7 +84,8 @@ export default function (pi: ExtensionAPI): void {
     description:
       "Proxy to Model Context Protocol (MCP) servers. Actions: list (show tools on one/all servers), " +
       "search (find tools by query and ACTIVATE them so they become directly callable by name), " +
-      "describe (show a tool's params/schema), call (invoke a tool; starts the server on first call). " +
+      "describe (server only: show its instructions and tool count; with tool: show that tool's params/schema), " +
+      "call (invoke a tool; starts the server on first call). " +
       "Available servers: " + manager.ids.join(", ") + ".",
     parameters: McpParams,
     promptSnippet: "mcp({action, server, tool, args, query}) — discover, activate, and call MCP tools",
@@ -162,7 +163,23 @@ async function run(
     }
     case "describe": {
       if (!server) return { text: 'Please provide a "server".' };
-      if (!p.tool) return { text: 'Please provide a "tool".' };
+      // 无 tool：server 级信息（含 instructions 按需带出——不进常驻 system prompt，DESIGN 不变量 8）。
+      if (!p.tool) {
+        try {
+          const info = await manager.serverInfo(server);
+          const lines = [
+            `MCP server: ${info.server}`,
+            `Tools: ${info.toolCount}${info.toolCount === 0 ? " (none listed)" : " — use mcp({action:\"list\", server}) or mcp({action:\"search\", query, server}) to see them"}`,
+          ];
+          if (info.instructions !== undefined) lines.push(`\nInstructions from this server:\n${info.instructions}`);
+          else if (info.instructionsOmittedReason !== undefined) lines.push(`\n[instructions omitted: ${info.instructionsOmittedReason}]`);
+          else lines.push("\nThis server publishes no instructions.");
+          return { text: lines.join("\n") };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { text: `Could not connect to MCP server "${server}": ${msg}` };
+        }
+      }
       const t = await manager.describe(server, p.tool);
       if (!t)
         return {
@@ -188,7 +205,11 @@ async function run(
         const added = meta ? registry.activate([meta.publicName]) : [];
         return {
           text: r.text,
-          details: { isError: r.isError, ...(added.length > 0 ? { activated: added } : {}) },
+          details: {
+            isError: r.isError,
+            ...(r.structuredContent !== undefined ? { structuredContent: r.structuredContent } : {}),
+            ...(added.length > 0 ? { activated: added } : {}),
+          },
         };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

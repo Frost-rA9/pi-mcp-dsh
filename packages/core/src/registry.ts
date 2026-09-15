@@ -13,10 +13,10 @@ import type { ExtensionAPI, AgentToolResult } from "@earendil-works/pi-coding-ag
 import type { ServerManager, ToolMeta } from "./connection.ts";
 import { MCP_NAMESPACE_PREFIX, compilableSchema, type ListedTool, scoreTools, type ToolHit } from "pi-mcp-dsh-bridge";
 
-function result(text: string, isError = false): AgentToolResult<unknown> {
+function result(text: string, isError = false, details: Record<string, unknown> = {}): AgentToolResult<unknown> {
   return {
     content: [{ type: "text", text }],
-    details: {},
+    details,
     ...(isError ? { isError: true as const } : {}),
   };
 }
@@ -68,7 +68,8 @@ export class DeferredRegistry {
           const r = await this.manager.call(serverId, meta.publicName, args as Record<string, unknown> | undefined, {
             ...(signal !== undefined ? { signal } : {}),
           });
-          return result(r.text, r.isError);
+          // canonical structuredContent 进 details（不进模型文本，零 prompt 代价）。
+          return result(r.text, r.isError, r.structuredContent !== undefined ? { structuredContent: r.structuredContent } : {});
         } catch (err) {
           return result(errorText(err), true);
         }

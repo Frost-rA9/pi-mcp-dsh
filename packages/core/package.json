@@ -13,7 +13,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types test/smoke.spec.ts"
+    "test": "node --experimental-strip-types test/smoke.spec.ts && node --experimental-strip-types test/loader.spec.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

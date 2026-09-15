@@ -23,6 +23,7 @@ import {
   type McpServerConfig,
   type McpServers,
   publicToolName,
+  resolveInstructions,
   resolveToolTimeoutMs,
   projectToolResult,
 } from "pi-mcp-dsh-bridge";
@@ -46,12 +47,28 @@ export interface ListedTool extends ToolMeta {
 export interface CallResult {
   text: string;
   isError: boolean;
+  /** canonical `structuredContent`（dsh `{ content, structuredContent? }`）；只进 pi details。 */
+  structuredContent?: unknown;
+}
+
+/** 一 server 的按需信息（instructions 只在 loader `describe` 时带出，不进常驻 prompt）。 */
+export interface ServerInfo {
+  server: string;
+  connected: boolean;
+  toolCount: number;
+  /** 已发布的 instructions；空未发布。 */
+  instructions?: string;
+  /** 因超字节上限而未发布时的原因（dsh `maxInstructionBytes`）。 */
+  instructionsOmittedReason?: string;
 }
 
 interface Runtime {
   transport: StdioClientTransport;
   client: Client;
   tools: ToolMeta[];
+  /** 本次连接的 server instructions（经 bridge `resolveInstructions` 规整）。 */
+  instructions?: string;
+  instructionsOmittedReason?: string;
 }
 
 interface CacheEntry {
@@ -72,6 +89,8 @@ interface RawTool {
 
 export class ServerManager {
   private runtimes = new Map<string, Runtime>();
+  /** 进行中的首次连接（连接建立单飞：并发首次调用只拉起一个子进程）。 */
+  private connecting = new Map<string, Promise<Runtime>>();
   private metaCache: Record<string, ToolMeta[]> = {};
   private cacheFile: string;
   private servers: McpServers;
@@ -172,6 +191,8 @@ export class ServerManager {
 
   // ---- 分页列出 ----
   private async fetchTools(client: Client, serverId: string): Promise<ToolMeta[]> {
+    // dsh：server 未声明 tools 能力 = 空集（资源型 server 连接成功、工具集为空，不报错）。
+    if (client.getServerCapabilities()?.tools === undefined) return [];
     const raw: RawTool[] = [];
     const cursors = new Set<string>();
     let cursor: string | undefined;
@@ -191,10 +212,25 @@ export class ServerManager {
   }
 
   // ---- 懒连接 ----
+  /**
+   * 连接建立单飞（DESIGN 不变量 7 / dsh「每 server 一连接 + sync 串行」）：
+   * 并发首次调用共享同一次建立；失败不缓存（下一次调用重试）。
+   */
   private async ensureConnected(serverId: string): Promise<Runtime> {
     const existing = this.runtimes.get(serverId);
     if (existing) return existing;
+    const inFlight = this.connecting.get(serverId);
+    if (inFlight) return inFlight;
+    const attempt = this.openConnection(serverId);
+    this.connecting.set(serverId, attempt);
+    try {
+      return await attempt;
+    } finally {
+      if (this.connecting.get(serverId) === attempt) this.connecting.delete(serverId);
+    }
+  }
 
+  private async openConnection(serverId: string): Promise<Runtime> {
     const cfg = this.servers[serverId];
     if (!cfg) throw new Error(`unknown MCP server: ${serverId}`);
 
@@ -224,7 +260,15 @@ export class ServerManager {
     });
 
     const tools = await this.fetchTools(client, serverId);
-    const runtime: Runtime = { transport, client, tools };
+    // instructions 随连接产出（dsh：discovery 成功后才有内容可发布；pi 只存起来供 loader 按需带出）。
+    const resolved = resolveInstructions(client.getInstructions());
+    const runtime: Runtime = {
+      transport,
+      client,
+      tools,
+      ...(resolved.text !== undefined ? { instructions: resolved.text } : {}),
+      ...(resolved.omittedReason !== undefined ? { instructionsOmittedReason: resolved.omittedReason } : {}),
+    };
     this.runtimes.set(serverId, runtime);
 
     const prev = this.metaCache[serverId];
@@ -303,7 +347,28 @@ export class ServerManager {
       },
     );
     const projected = projectToolResult(result);
-    return { text: projected.text, isError: projected.isError };
+    return {
+      text: projected.text,
+      isError: projected.isError,
+      ...(projected.structuredContent !== undefined ? { structuredContent: projected.structuredContent } : {}),
+    };
+  }
+
+  /**
+   * 连接后交付一 server 的按需信息（loader `describe {server}`）：工具数 + 已发布 instructions。
+   * 未连接时也会连接（与 `list` 一致的显式发现路径）。
+   */
+  async serverInfo(serverId: string): Promise<ServerInfo> {
+    const rt = await this.ensureConnected(serverId);
+    return {
+      server: serverId,
+      connected: true,
+      toolCount: rt.tools.length,
+      ...(rt.instructions !== undefined ? { instructions: rt.instructions } : {}),
+      ...(rt.instructionsOmittedReason !== undefined
+        ? { instructionsOmittedReason: rt.instructionsOmittedReason }
+        : {}),
+    };
   }
 
   async disconnectAll(): Promise<void> {
