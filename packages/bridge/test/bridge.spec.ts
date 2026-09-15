@@ -1,10 +1,12 @@
-// bridge 纯函数测试：命名契约、配置校验、打分、结果投影。
+// bridge 纯函数测试：命名契约、配置校验、打分、结果投影（含 canonical structuredContent）、server instructions 上限。
 // 单一参考源 = dsh mcp-client（publicToolName / resolveConfig / 结果投影）。
 import assert from "node:assert/strict";
 import {
   MCP_NAMESPACE_PREFIX,
   MAX_PUBLIC_NAME_LENGTH,
+  MAX_INSTRUCTION_BYTES,
   publicToolName,
+  resolveInstructions,
   resolveMcpServerConfig,
   resolveToolTimeoutMs,
   scoreTools,
@@ -93,6 +95,36 @@ test("projectToolResult 非文本块 JSON 序列化 + 是错误则标记", () =>
   const r = projectToolResult({ isError: true, content: [{ type: "text", text: "boom" }] });
   assert.equal(r.text, "boom");
   assert.equal(r.isError, true);
+});
+
+test("projectToolResult 带回 canonical structuredContent（dsh {content,structuredContent?}）", () => {
+  const withStructured = projectToolResult({
+    content: [{ type: "text", text: "ok" }],
+    structuredContent: { message: "hi", source: "srv" },
+  });
+  assert.deepEqual(withStructured.structuredContent, { message: "hi", source: "srv" });
+  const without = projectToolResult({ content: [{ type: "text", text: "ok" }] });
+  assert.equal("structuredContent" in without, false, "absent when the server sent none");
+});
+
+// ---- resolveInstructions（dsh maxInstructionBytes；pi 裁剪为不发布 + 原因） ----
+test("resolveInstructions 空/空白不发布", () => {
+  assert.deepEqual(resolveInstructions(undefined), {});
+  assert.deepEqual(resolveInstructions("   \n"), {});
+});
+
+test("resolveInstructions 正常指令去掉尾部空白后发布", () => {
+  assert.deepEqual(resolveInstructions("call ping first\n"), { text: "call ping first" });
+});
+
+test("resolveInstructions 超字节上限不发布内容、只带原因（对齐 dsh 默认 32768）", () => {
+  assert.equal(MAX_INSTRUCTION_BYTES, 32_768);
+  const over = "x".repeat(MAX_INSTRUCTION_BYTES + 1);
+  const r = resolveInstructions(over);
+  assert.equal(r.text, undefined, "oversize content is not published");
+  assert.match(r.omittedReason ?? "", /32768/);
+  const atLimit = resolveInstructions("y".repeat(MAX_INSTRUCTION_BYTES));
+  assert.equal(atLimit.text?.length, MAX_INSTRUCTION_BYTES, "exactly at the limit is published");
 });
 
 console.log(`\n# bridge: ${n} tests passed`);

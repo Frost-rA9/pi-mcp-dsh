@@ -5,7 +5,7 @@
  * 命名契约 `mcp__<server>__<rawName>`（64 字符规范化 + sha256 防碰撞，dsh `publicToolName`）、
  * MCP server 配置校验（对齐 dsh `resolveConfig`：未知键拒绝）、loader `search` 打分与
  * schema 规整、工具结果投影（对齐 dsh 结果投影：isError→throw 映射为 pi isError 结果、文本块拼序、
- * outputSchema 校验→structuredContent 否则 JsonValue，不静默丢弃）。
+ * canonical `{ content, structuredContent? }` 不静默丢弃）、server instructions 的字节上限。
  *
  * 全部为纯函数（无副作用），供 core（唯一 pi 扩展宿主）与测试共享。
  *
@@ -174,17 +174,48 @@ export interface ProjectedToolResult {
   text: string;
   /** dsh `isError → throw` 映射为 pi 的 isError 结果标记。 */
   isError: boolean;
+  /** canonical 结果的 `structuredContent`（dsh `{ content, structuredContent? }`）；只进 pi `details`，不进模型文本。 */
+  structuredContent?: unknown;
 }
 
 /**
  * 把 MCP CallToolResult 的 content 块展平为单一文本：文本块按序拼接，非文本块 JSON 序列化。
- * 对齐 dsh「文本块按序拼接；不静默丢弃」。
+ * 对齐 dsh「文本块按序拼接；不静默丢弃」；canonical `structuredContent` 单独带回（进 pi details）。
  */
 export function projectToolResult(result: unknown): ProjectedToolResult {
-  const r = (result ?? {}) as { content?: unknown; isError?: boolean };
+  const r = (result ?? {}) as { content?: unknown; isError?: boolean; structuredContent?: unknown };
   const blocks = Array.isArray(r.content) ? (r.content as Array<{ type?: string; text?: string }>) : [];
   const text = blocks
     .map((b) => (typeof b.text === "string" ? b.text : JSON.stringify(b)))
     .join("\n");
-  return { text, isError: r.isError === true };
+  return {
+    text,
+    isError: r.isError === true,
+    ...(r.structuredContent !== undefined ? { structuredContent: r.structuredContent } : {}),
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * server instructions（dsh `maxInstructionBytes`；pi 裁剪为按需带出）
+ * ------------------------------------------------------------------------ */
+
+/**
+ * server instructions 的 UTF-8 字节上限。对齐 dsh `maxInstructionBytes` 默认值（32768）。
+ * dsh 超限即拒绝连接；pi 裁剪为“不发布内容 + 说明原因”（见 DESIGN §六）。
+ */
+export const MAX_INSTRUCTION_BYTES = 32_768;
+
+/**
+ * 将一次连接得到的 server instructions 规整为可发布的文本。
+ * @param raw - `client.getInstructions()` 的原始值。
+ * @returns 可发布文本，或 None：空/空白（不发布）、超字节上限（带原因不发布）。
+ */
+export function resolveInstructions(raw: string | undefined): { text?: string; omittedReason?: string } {
+  const text = (raw ?? "").trimEnd();
+  if (text === "") return {};
+  const bytes = Buffer.byteLength(text, "utf8");
+  if (bytes > MAX_INSTRUCTION_BYTES) {
+    return { omittedReason: `server instructions (${bytes} UTF-8 bytes) exceed the bridge limit of ${MAX_INSTRUCTION_BYTES} bytes` };
+  }
+  return { text };
 }
