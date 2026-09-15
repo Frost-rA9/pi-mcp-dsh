@@ -71,10 +71,20 @@
 - **不做 OAuth / 远程传输**：仅 stdio；远程/认证留作后续。
 - **gate 是纵深防御**：`edit` 不在活动集时拒绝调用；因 plan 已改软引导（不删工具），此 gate 多数场景不触发，仅为 fail-closed 兜底。
 - **instructions 超限 = 不发布 + 说明**（dsh 是拒绝连接）：32768 字节上限对齐 dsh `maxInstructionBytes` 默认值；pi 侧改为在 loader 结果里报告被省略及字节数，不让一个啰嗦的 server 变成不可用。
-- **不做 resources 桥**（dsh `mcp-resources` 的 3 个共享工具 + 服务器名 prompt 段）：**下一步候选**。落地前需先定形——共享工具（dsh 形）与 pi 的 deferred/按名激活模型不同，且 blob→描述 的渲染规则要单独定。
-- **不迁移 `@modelcontextprotocol/client@2.0.0`**（最新已发布）：**下一步候选**。收益是协议协商（2026-07-28 + 旧修订回落）、SDK 自持分页/校验、官方 spec 类型；代价是连接层重写（`versionNegotiation`、stdio probe 进程、`cacheMode`、`toolDefinition` 参数）且**必须显式设 `autoRefresh: false`**，否则与两相世代交换打架。
+- **不做 resources 桥**（dsh `mcp-resources` 的 3 个共享工具 + 服务器名 prompt 段）：见下方评估表（**暂不做**）。落地前需先定形——共享工具（dsh 形）与 pi 的 deferred/按名激活模型不同，且 blob→描述 的渲染规则要单独定。
+- **不迁移 `@modelcontextprotocol/client@2.0.0`**（最新已发布）：见下方评估表（**暂不迁；若迁则不要用 `auto`**）。收益是协议协商（2026-07-28 + 旧修订回落）、SDK 自持分页/校验、官方 spec 类型；代价是连接层重写（`versionNegotiation`、`cacheMode`、`toolDefinition` 参数）且**必须显式设 `autoRefresh: false`**，否则与两相世代交换打架。
 - **不采纳 dsh「关闭无法确认 → 停止重连」**：该规则属于 dsh 的重连监督器；pi 无监督器（懒连接），且 1.x SDK 的 `close()` 已是 stdin 结束 → SIGTERM → SIGKILL，几乎不产生残留进程。若将来迁移 SDK 2.0 或引入监督器，需重新评估（不变量 7 的单飞是当前等价物）。
 - **`structuredContent` 只进 pi `details`**：canonical `{ content, structuredContent? }` 的后者不进模型文本（零 prompt 代价），只供宿主/程序化使用；模型可见部分仍是展平文本。
+- **MCP server 在 workspace 外写状态时，受限档位下连不上（跨扩展交互，已实测）**：`uvx` 型 server 会在 `~/.cache/uv` 建临时文件，read-only / workspace-write 档下得到 `Read-only file system` → 连接关闭。不是任一扩展的 bug（读全开/写面受限是本套设计的承诺），但排障时先看这一点：把 server 的缓存/状态目录指到工作区内，或显式放宽档位。
+
+### 候选评估结论（2026-09-15 实测）
+
+| 候选 | 结论 | 依据 |
+|---|---|---|
+| resources 桥 | **暂不做** | 本机唯一配置的 server（semble）虽声明 `resources`，但实测 `resources/list` = 0、`templates/list` = 0 → 做出来只会返回空列表，代价是 3 个工具面 + blob 渲染 + 共享/每 server 的 deferred 形态设计。等真有 server 发布资源再做 |
+| 迁 SDK 2.0 | **暂不迁；若迁则不要用 `auto`** | 2.0 客户端接本仓 1.x echo server 实测：协商回落到 `2025-11-25`，`getInstructions` / `listTools(undefined,{cacheMode})` / `callTool(..,{toolDefinition})` 均可用。进程数：`legacy`（2.0 默认）= **1**，`auto`（dsh 的选择）= **2**（临时 probe + 服务进程）→ `auto` 与不变量 7「一 server 一进程」冲突，对带启动副作用的 server 是真实风险；而当前 1.30 已能正常访问在用的 server，净收益≈零 |
+| close-confirmation 规则 | **不做** | 该规则服务于 dsh 的重连监督器；pi 无监督器，且 1.x `StdioClientTransport.close()` 已是「关 stdin → 2s → SIGTERM → 2s → SIGKILL」、`onclose` 由子进程 close 事件驱动，几乎不产生残留；防叠加已由不变量 7 覆盖 |
+| 自持分页 drain（相对 dsh 的偏离） | **保留** | 我们的 drain 带「重复 cursor 拒绝」护栏；dsh 新版把分页完全交给 SDK 并接受其行为。保留 = 异常 server 更早暴露（fail-closed） |
 
 ## 七、验证与规模
 
