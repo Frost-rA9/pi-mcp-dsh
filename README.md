@@ -32,7 +32,7 @@ This is **cross-cutting infrastructure** — how external MCP tools reach the mo
 
 ## Backends
 
-MCP servers over stdio transport, config-driven (`mcpServers` in `~/.pi/agent/mcp.json` or `.pi/mcp.json`). See [RESEARCH.md](RESEARCH.md) for the dsh `mcp-client` study and [DESIGN.md](DESIGN.md) for the design rationale.
+MCP servers over stdio transport, config-driven (`mcpServers` in `~/.pi/agent/mcp.json` or `.pi/mcp.json`). See [docs/architecture.md](docs/architecture.md) for the architecture, dsh semantics anchors, invariants, and known trade-offs.
 
 ## License
 
