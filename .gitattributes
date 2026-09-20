@@ -1,0 +1,4 @@
+# 统一行尾：仓库内与各平台工作区一律 LF。
+# 起因：Windows 侧检出曾把工作区写成 CRLF，git 因此把 29 个文件误报为“已修改”（6120+/6120− 完全对称）。
+# `text=auto` 提交时把 CRLF 归一为 LF；`eol=lf` 让检出也始终是 LF（优先于 core.autocrlf，新克隆无需再配）。
+* text=auto eol=lf
