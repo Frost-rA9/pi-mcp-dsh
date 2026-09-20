@@ -2,7 +2,7 @@
 
 > 把 **MCP server 的工具桥接成真实 pi 工具**（`mcp__<server>__<tool>`），在 pi 原生 **Dynamic Tool Loading** 上做 **deferred 注册**。
 > pi 核心刻意不内置 MCP 客户端（传输/握手/发现/投影由本扩展承担）——这是**跨切面基础设施**，与 `pi-sandbox-dsh` / `pi-plan-dsh` 完全正交。
-> 单一参考源 = dsh `packages/mcp/mcp-client`；锚点 `0d1f50007f`。行为约束见 `AGENTS.md`（本地文件、不入库）。
+> 单一参考源 = dsh `packages/mcp/mcp-client`；锚点 `ddefc45fbc`（本轮重核：`mcp-client/src/` **零变更**，仅 package.json 版本与 tests/http-fixture.ts 夹具）。行为约束见 `AGENTS.md`（本地文件、不入库）。
 
 ## pi 机制映射
 
