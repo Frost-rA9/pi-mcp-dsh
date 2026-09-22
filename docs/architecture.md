@@ -6,6 +6,9 @@
 
 ## pi 机制映射
 
+> **pi 0.87.0 重核（2026-09-21）**：本表所列机制在 0.87.0 均未变——`before_agent_start` 仍支持返回 `systemPrompt`，`ctx.sessionManager.getEntries()` 仍在只读面上；0.87 的破坏性变更（移除 `shouldStopAfterTurn` / `SessionEntry` 增 `ContextEditEntry` / `SessionManager` 成为 provider 上下文权威 / `TurnEndEvent`·`AgentBeforeSettleEvent` 边界）均不在本扩展的 API 面上，`npm run typecheck` + `npm test` 已在 0.87.0 下通过。
+> **devDep 下限须跟运行时对齐**：pi 扩展加载器把 `@earendil-works/pi-coding-agent` / `pi-tui` / `pi-agent-core` / `typebox` 别名到宿主入口（`dist/core/extensions/loader.js` `getAliases()`），扩展目录里的副本**只在 typecheck 生效**、运行时永远绑宿主 pi —— 故本次 `>=0.86.1` → `>=0.87.0`。
+
 | 需求 | pi 原生机制 |
 |---|---|
 | 桥接工具 | `registerTool`（每个 MCP 工具 = 真实 pi 工具，但 **inactive**） |
